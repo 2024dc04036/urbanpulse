@@ -1,0 +1,14 @@
+# 1. Bus GPS (24 Hours Retention)
+kafka-topics.sh --bootstrap-server localhost:9092 --create --topic urbanpulse.bus_gps --partitions 12 --replication-factor 3 --config retention.ms=86400000
+
+# 2. Traffic Signals (7 Days Retention)
+kafka-topics.sh --bootstrap-server localhost:9092 --create --topic urbanpulse.traffic_signals --partitions 6 --replication-factor 3 --config retention.ms=604800000
+
+# 3. Air Quality (90 Days Retention)
+kafka-topics.sh --bootstrap-server localhost:9092 --create --topic urbanpulse.air_quality --partitions 3 --replication-factor 3 --config retention.ms=7776000000
+
+# 4. Smart Meters (365 Days Retention)
+kafka-topics.sh --bootstrap-server localhost:9092 --create --topic urbanpulse.smart_meters --partitions 24 --replication-factor 3 --config retention.ms=31536000000
+
+# 5. Dead Letter Queue (30 Days Retention)
+kafka-topics.sh --bootstrap-server localhost:9092 --create --topic urbanpulse.dlq --partitions 3 --replication-factor 3 --config retention.ms=2592000000
