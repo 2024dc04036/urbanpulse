@@ -4,6 +4,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from kafka import KafkaConsumer, KafkaProducer
 
+
 # Initialize Kafka Consumer and Producer
 consumer = KafkaConsumer(
     'urbanpulse.transit.bus-gps',
