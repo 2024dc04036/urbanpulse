@@ -1,14 +1,45 @@
-# 1. Bus GPS (24 Hours Retention)
+# ================================================================================
+# UrbanPulse Kafka Topic Provisioning
+# ================================================================================
+# Prerequisites: Ensure at least 3 brokers are running for replication-factor 3.
+# If running a single-broker dev environment, change --replication-factor to 1.
+# ================================================================================
+ 
+# --------------------------------------------------------------------------------
+# INPUT TOPICS (data ingestion from IoT sensors / producers)
+# --------------------------------------------------------------------------------
+ 
+# 1. Bus GPS (24 Hours Retention) - High volume, 12 partitions for parallelism
 kafka-topics.sh --bootstrap-server localhost:9092 --create --topic urbanpulse.bus_gps --partitions 12 --replication-factor 3 --config retention.ms=86400000
-
+ 
 # 2. Traffic Signals (7 Days Retention)
 kafka-topics.sh --bootstrap-server localhost:9092 --create --topic urbanpulse.traffic_signals --partitions 6 --replication-factor 3 --config retention.ms=604800000
-
+ 
 # 3. Air Quality (90 Days Retention)
-kafka-topics.sh --bootstrap-server localhost:9092 --create --topic urbanpulse.air_quality --partitions 3 --replication-factor 3 --config retention.ms=7776000000
-
+kafka-topics.sh --bootstrap-server localhost:9092 --create --topic urbanpulse.air_quality --partitions 6 --replication-factor 3 --config retention.ms=7776000000
+ 
 # 4. Smart Meters (365 Days Retention)
-kafka-topics.sh --bootstrap-server localhost:9092 --create --topic urbanpulse.smart_meters --partitions 24 --replication-factor 3 --config retention.ms=31536000000
-
-# 5. Dead Letter Queue (30 Days Retention)
+kafka-topics.sh --bootstrap-server localhost:9092 --create --topic urbanpulse.smart_meters --partitions 12 --replication-factor 3 --config retention.ms=31536000000
+ 
+# --------------------------------------------------------------------------------
+# OUTPUT TOPICS (produced by streaming pipelines)
+# --------------------------------------------------------------------------------
+ 
+# 5. Incidents - produced by detector.py (Flink) for AQI/Gridlock/Bunching alerts
+kafka-topics.sh --bootstrap-server localhost:9092 --create --topic urbanpulse.incidents --partitions 6 --replication-factor 3 --config retention.ms=604800000
+ 
+# 6. Enriched Bus Telemetry - produced by faust.py (GPS joined with route schedule)
+kafka-topics.sh --bootstrap-server localhost:9092 --create --topic urbanpulse.transit.enriched_gps --partitions 12 --replication-factor 3 --config retention.ms=86400000
+ 
+# 7. Health Advisories - produced by health_adv.py (Spark SQL windowed AQI alerts)
+kafka-topics.sh --bootstrap-server localhost:9092 --create --topic urbanpulse.health_advisories --partitions 6 --replication-factor 3 --config retention.ms=604800000
+ 
+# 8. Ward Energy Summary - produced by energy_aggregator.py (15-min ward aggregations)
+kafka-topics.sh --bootstrap-server localhost:9092 --create --topic ward_energy_summary --partitions 6 --replication-factor 3 --config retention.ms=604800000
+ 
+# --------------------------------------------------------------------------------
+# OPERATIONAL TOPICS
+# --------------------------------------------------------------------------------
+ 
+# 9. Dead Letter Queue (30 Days Retention) - failed/unprocessable messages
 kafka-topics.sh --bootstrap-server localhost:9092 --create --topic urbanpulse.dlq --partitions 3 --replication-factor 3 --config retention.ms=2592000000
