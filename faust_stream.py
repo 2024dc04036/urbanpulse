@@ -1,8 +1,8 @@
 import faust
-
+ 
 # Define the Streaming Application Engine
 app = faust.App('urbanpulse-spatial-enrichment', broker='kafka://localhost:9092')
-
+ 
 # --------------------------------------------------------------------------------
 # DESERIALIZATION SCHEMAS
 # --------------------------------------------------------------------------------
@@ -14,12 +14,12 @@ class BusGPS(faust.Record, serializer='json'):
     speed_kmh: int
     occupancy_pct: int
     timestamp: str
-
+ 
 class RouteSchedule(faust.Record, serializer='json'):
     route_name: str
     scheduled_arrival_time: str
     terminal: str
-
+ 
 class EnrichedBusTelemetry(faust.Record, serializer='json'):
     bus_id: str
     route_id: str
@@ -30,21 +30,22 @@ class EnrichedBusTelemetry(faust.Record, serializer='json'):
     scheduled_arrival_time: str
     terminal: str
     enriched_timestamp: str
-
+ 
 # --------------------------------------------------------------------------------
 # STREAM AND KTABLE PROVISIONING
 # --------------------------------------------------------------------------------
 gps_topic = app.topic('urbanpulse.bus_gps', value_type=BusGPS)
 enriched_topic = app.topic('urbanpulse.transit.enriched_gps', value_type=EnrichedBusTelemetry)
-
+ 
 # The Global KTable handles static schedule metadata lookups keyed by Route ID
-route_schedule_table = app.Table('route_schedule_ktable', default=dict, value_type=RouteSchedule)
-
-@app.task
+route_schedule_table = app.Table('route_schedule_ktable', default=None, value_type=RouteSchedule)
+ 
+@app.task(on_leader=True)
 async def seed_schedule_table_from_csv():
     """
-    Simulates parsing the administrative CSV itinerary reference file 
+    Simulates parsing the administrative CSV itinerary reference file
     and populating the KTable cache at architecture runtime.
+    Runs only on the leader worker to avoid redundant writes.
     """
     mock_csv_rows = {
         "ROUTE-101": {"route_name": "Metro-Express North", "scheduled_arrival_time": "14:45:00", "terminal": "Terminal-A"},
@@ -55,7 +56,7 @@ async def seed_schedule_table_from_csv():
     for route_id, metadata in mock_csv_rows.items():
         route_schedule_table[route_id] = RouteSchedule(**metadata)
     print("📋 Global Route Schedule KTable successfully hydrated from storage reference.")
-
+ 
 # --------------------------------------------------------------------------------
 # STREAM JOIN ENGINE (Enrichment Topology)
 # --------------------------------------------------------------------------------
@@ -63,9 +64,8 @@ async def seed_schedule_table_from_csv():
 async def process_gps_stream(stream):
     async for event in stream:
         # Retrieve reference structural schedule from the KTable using the partition key (route_id)
-        schedule_metadata = route_schedule_table[event.route_id]
-        
-        if schedule_metadata:
+        schedule_metadata = route_schedule_table.get(event.route_id)
+        if schedule_metadata is not None:
             # Construct the unified, enriched real-time payload
             enriched_payload = EnrichedBusTelemetry(
                 bus_id=event.bus_id,
@@ -83,6 +83,6 @@ async def process_gps_stream(stream):
         else:
             # Fallback handling for unmapped transit routes
             print(f"⚠️ [ENRICHMENT ERROR] No schedule reference located for Route ID: {event.route_id}")
-
+ 
 if __name__ == '__main__':
     app.main()
